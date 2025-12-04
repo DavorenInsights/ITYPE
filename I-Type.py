@@ -8,7 +8,7 @@ from idix_engine import (
     monte_carlo_probabilities,
 )
 
-# Optional: if data_logger is present, we log; if not, app still runs
+# Optional: anonymous logging (safe if file missing)
 try:
     from data_logger import log_response
     HAS_LOGGER = True
@@ -78,7 +78,7 @@ st.markdown("""
 
 
 # ============================================================
-# STEP PROGRESS BAR (2 STEPS NOW)
+# STEP PROGRESS BAR (2 STEPS)
 # ============================================================
 
 step = st.session_state["step"]
@@ -98,7 +98,9 @@ st.progress(step / total_steps)
 # ============================================================
 
 def get_answers_from_state(questions_list):
-    """Rebuilds the `answers` dict from stored slider values in session_state."""
+    """
+    Rebuilds the `answers` dict from stored slider values in session_state.
+    """
     answers = {}
     for i, q in enumerate(questions_list):
         text = q.get("question", f"Question {i+1}")
@@ -142,10 +144,10 @@ if step == 1:
         for i, q in enumerate(questions):
             text = q.get("question", f"Question {i+1}")
 
-            # Question Card
+            # Question block
             st.markdown(f"""
-            <div class='itype-question'>
-                <p><b>{text}</b></p>
+            <div class="itype-question">
+            <p><b>{text}</b></p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -163,7 +165,7 @@ if step == 1:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns(2)
 
     with col1:
         if st.button("Reset"):
@@ -193,16 +195,39 @@ elif step == 2:
     else:
         answers = get_answers_from_state(questions)
 
+        # ----------------------------------------------
+        # CONSENT CHECKBOX (BEFORE CALCULATION)
+        # ----------------------------------------------
+        st.markdown("""
+        <div style="margin-top: 10px; margin-bottom: 8px; padding: 10px;
+             border: 1px solid #00eaff55; border-radius: 8px; font-size: 0.9rem;">
+        <b>Optional:</b> You can help improve I-TYPE for future users by allowing
+          your anonymous scores to be used for validation and refinement.
+        </div>
+        """, unsafe_allow_html=True)
+
+        consent = st.checkbox(
+            "I agree that my anonymous scores may be used to improve the I-TYPE model.",
+            value=True,
+            help="No name, email, or identifying information is stored — only numeric scores."
+        )
+
+        if consent:
+            st.info("✅ Thank you — your responses will be stored anonymously (no personal data).")
+
+        # ----------------------------------------------
+        # CALC BUTTON
+        # ----------------------------------------------
         calc = st.button("🚀 Calculate My Innovator Type")
 
         if calc:
             st.session_state["has_results"] = True
             st.session_state["open_archetype"] = None  # reset open tile
 
-            # Step 1: questionnaire scores
+            # Step 1: questionnaire scores (0–100 per dimension)
             final_scores = normalize_scores(answers)
 
-            # Step 2: determine primary archetype
+            # Step 2: determine primary archetype (weighted Euclidean)
             primary_name, archetype_data = determine_archetype(final_scores, archetypes)
 
             if primary_name is None or archetype_data is None:
@@ -213,78 +238,57 @@ elif step == 2:
                 shadow_name, shadow_pct = shadow
 
                 # ----------------------------------------------
+                # ANONYMOUS LOGGING IF ALLOWED
                 # ----------------------------------------------
-                # SAVE ANONYMOUS DATA IF CONSENT GIVEN
-                # ----------------------------------------------
-                if consent:
-                    import pandas as pd
-                    import os
-                
-                    save_path = "data/itype_responses.csv"
-                
-                    # Create folder if missing
-                    os.makedirs("data", exist_ok=True)
-                
-                    # Build one-row record
-                    record = {
-                        "archetype": primary_name,
-                        "shadow": shadow_name,
-                        "stability": round(stability, 2),
-                        **{f"dim_{k}": v for k, v in final_scores.items()}
-                    }
-                
-                    # Append or create new file
-                    if os.path.exists(save_path):
-                        df = pd.read_csv(save_path)
-                        df = df.append(record, ignore_index=True)
-                    else:
-                        df = pd.DataFrame([record])
-                
-                    df.to_csv(save_path, index=False)
-
+                if HAS_LOGGER and consent:
+                    try:
+                        log_response(
+                            final_archetype=primary_name,
+                            stability=stability,
+                            shadow=shadow,
+                            scores=final_scores,
+                            raw_answers=answers
+                        )
+                    except Exception as e:
+                        st.warning(f"Could not log response (internal error): {e}")
 
                 # ----------------------------------------------
                 # HERO CARD + MAIN ARCHETYPE IMAGE
                 # ----------------------------------------------
                 img_path = f"data/archetype_images/{primary_name}.png"
 
-                # Show image if present (won't break if missing)
                 try:
                     st.image(img_path, use_column_width=False)
                 except Exception:
+                    # Image optional, don't break if not present
                     pass
 
                 st.markdown(f"""
-                <div class='itype-result-card'>
+                <div class="itype-result-card">
                 <h1>{primary_name}</h1>
-                <p>{archetype_data.get("description","")}</p>
+                <p>{archetype_data.get("description", "")}</p>
                 <p><b>Stability:</b> {stability:.1f}%</p>
                 <p><b>Shadow archetype:</b> {shadow_name} ({shadow_pct:.1f}%)</p>
                 </div>
                 """, unsafe_allow_html=True)
 
                 # ----------------------------------------------
-                # RADAR CHART (FULLY FIXED + CONSISTENT ORDER)
+                # RADAR CHART — FIXED DIMENSION ORDER
                 # ----------------------------------------------
                 st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
 
-                # enforce correct dimension order
                 dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
+                vals = [final_scores.get(d, 0.0) for d in dims]
 
-                # pull values in correct order
-                vals = [final_scores[d] for d in dims]
-
-                # close polygon for radar shape
                 vals_closed = vals + [vals[0]]
                 dims_closed = dims + [dims[0]]
 
                 radar = go.Figure()
-
                 radar.add_trace(go.Scatterpolar(
                     r=vals_closed,
                     theta=dims_closed,
                     fill='toself',
-                    fillcolor='rgba(0,234,255,0.25)',  # subtle neon glow
+                    fillcolor='rgba(0,234,255,0.25)',
                     line_color='#00eaff',
                     line_width=3,
                     marker=dict(size=6, color="#00eaff")
@@ -320,59 +324,55 @@ elif step == 2:
 
                 sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
 
-                fig = go.Figure()
-                fig.add_trace(go.Bar(
+                bar_fig = go.Figure()
+                bar_fig.add_trace(go.Bar(
                     x=[p[0] for p in sorted_probs],
                     y=[p[1] for p in sorted_probs],
                     marker_color="#00eaff"
                 ))
-                fig.update_layout(
+                bar_fig.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)',
                     yaxis_title="Probability (%)"
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(bar_fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 # ----------------------------------------------
-                # HEATMAP (3×3 ARCHETYPE GRID — POLISHED)
+                # HEATMAP (3×3 ARCHETYPE GRID)
                 # ----------------------------------------------
                 st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
 
-                # 3x3 archetype matrix
                 heat_archetypes = [
                     ["Visionary", "Strategist", "Storyteller"],
                     ["Catalyst", "Apex Innovator", "Integrator"],
                     ["Engineer", "Operator", "Experimenter"]
                 ]
 
-                # probability values
                 heat_values = [
-                    [probs.get(a, 0) for a in row]
+                    [probs.get(a, 0.0) for a in row]
                     for row in heat_archetypes
                 ]
 
-                # Row + column labels
                 row_labels = ["Ideation Cluster", "Activation Cluster", "Execution Cluster"]
                 col_labels = ["Visionary", "Strategist", "Storyteller"]
 
-                # Create figure
                 heat_fig = go.Figure(data=go.Heatmap(
                     z=heat_values,
                     x=col_labels,
                     y=row_labels,
                     colorscale="blues",
                     zmin=0,
-                    zmax=max([max(row) for row in heat_values] + [1]),  # ensure scale
+                    zmax=max([max(row) for row in heat_values] + [1]),
                     showscale=True,
                     hoverinfo="skip"
                 ))
 
-                # Add annotations inside each cell
+                # Add annotations (black text inside cells)
                 annotations = []
                 for i, row in enumerate(heat_archetypes):
                     for j, archetype in enumerate(row):
-                        pct = probs.get(archetype, 0)
+                        pct = probs.get(archetype, 0.0)
                         annotations.append(dict(
                             x=col_labels[j],
                             y=row_labels[i],
@@ -402,43 +402,53 @@ elif step == 2:
 
                 st.markdown("<h3>Strengths</h3>", unsafe_allow_html=True)
                 for s in archetype_data.get("strengths", []):
-                    st.markdown(f"<div class='itype-strength-card'>• {s}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='itype-strength-card'>• {s}</div>",
+                                unsafe_allow_html=True)
 
-                st.markdown("<h3 style='margin-top:20px;'>Growth Edges & Risks</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin-top:20px;'>Growth Edges & Risks</h3>",
+                            unsafe_allow_html=True)
                 for r in archetype_data.get("risks", []):
-                    st.markdown(f"<div class='itype-risk-card'>• {r}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='itype-risk-card'>• {r}</div>",
+                                unsafe_allow_html=True)
 
-                st.markdown("<h3 style='margin-top:20px;'>Recommended Innovation Pathways</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin-top:20px;'>Recommended Innovation Pathways</h3>",
+                            unsafe_allow_html=True)
                 for pth in archetype_data.get("pathways", []):
-                    st.markdown(f"<div class='itype-pathway-card'>• {pth}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='itype-pathway-card'>• {pth}</div>",
+                                unsafe_allow_html=True)
 
-                st.markdown("<h3 style='margin-top:20px;'>Suggested Business Models</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin-top:20px;'>Suggested Business Models</h3>",
+                            unsafe_allow_html=True)
                 for bm in archetype_data.get("business_models", []):
-                    st.markdown(f"<div class='itype-business-card'>• {bm}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='itype-business-card'>• {bm}</div>",
+                                unsafe_allow_html=True)
 
-                st.markdown("<h3 style='margin-top:20px;'>Funding Strategy Fit</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin-top:20px;'>Funding Strategy Fit</h3>",
+                            unsafe_allow_html=True)
                 for fs in archetype_data.get("funding_strategy", []):
-                    st.markdown(f"<div class='itype-funding-card'>• {fs}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='itype-funding-card'>• {fs}</div>",
+                                unsafe_allow_html=True)
 
                 st.markdown("<hr><h3>How to Interpret Your Results</h3>", unsafe_allow_html=True)
                 st.markdown("""
-                - **Stability %** — how consistent your identity is across 5000 simulations.  
+                - **Stability %** — how consistent your identity is across many simulations.  
                 - **Shadow archetype** — your second-strongest identity.  
-                - **Identity spectrum** — distribution of probabilities across all archetypes.  
-                - **Heatmap** — where your identity clusters in the 3×3 matrix.  
-                - **Radar chart** — your core innovation dimensions (thinking, execution, risk, motivation, team, commercial).
+                - **Identity spectrum** — how your profile spreads across all archetypes.  
+                - **Heatmap** — how you cluster in the 3×3 innovation matrix.  
+                - **Radar chart** — your core innovation dimensions: 
+                  thinking, execution, risk, motivation, team, commercial.
                 """)
 
                 st.markdown("""
                 <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 1.5rem;">
-                🔒 <b>Privacy:</b> This assessment only stores anonymous responses for model improvement.
-                No names, emails, or identifying details are collected.
+                  🔒 <b>Privacy:</b> Only numeric scores are stored (if you opt in). 
+                  No names, emails, or identifying details are collected.
                 </p>
                 """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns(2)
 
     with col1:
         if st.button("⬅ Back to Questions"):
@@ -450,7 +460,7 @@ elif step == 2:
     with col2:
         if st.button("🔄 Start Over"):
             for key in list(st.session_state.keys()):
-                if key.startswith("q") or key.startswith("sc_"):
+                if key.startswith("q"):
                     del st.session_state[key]
             st.session_state["step"] = 1
             st.session_state["has_results"] = False
@@ -464,12 +474,12 @@ elif step == 2:
 
 if st.session_state.get("has_results") and archetypes:
 
-    # Create the state key once (safety)
     if "open_archetype" not in st.session_state:
         st.session_state["open_archetype"] = None
 
     st.markdown("<hr class='hr-neon'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align:center;'>Explore All Archetypes</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>Explore All Archetypes</h2>",
+                unsafe_allow_html=True)
     st.markdown("<p style='opacity:0.85; text-align:center;'>Click a tile to reveal its profile.</p>",
                 unsafe_allow_html=True)
 
@@ -478,13 +488,11 @@ if st.session_state.get("has_results") and archetypes:
     for idx, (name, data) in enumerate(archetypes.items()):
         with cols[idx % 3]:
             if st.button(name, key=f"arch_btn_{name}", use_container_width=True):
-                # Toggle open/close
                 if st.session_state["open_archetype"] == name:
                     st.session_state["open_archetype"] = None
                 else:
                     st.session_state["open_archetype"] = name
 
-    # EXPANDED PANEL
     selected = st.session_state["open_archetype"]
 
     if selected is not None:
@@ -503,20 +511,19 @@ if st.session_state.get("has_results") and archetypes:
         <p>{info.get("description","")}</p>
 
         <h4>Strengths</h4>
-        <ul>{''.join(f'<li>{s}</li>' for s in info.get('strengths',[]))}</ul>
+        <ul>{''.join(f'<li>{s}</li>' for s in info.get('strengths', []))}</ul>
 
         <h4>Risks</h4>
-        <ul>{''.join(f'<li>{r}</li>' for r in info.get('risks',[]))}</ul>
+        <ul>{''.join(f'<li>{r}</li>' for r in info.get('risks', []))}</ul>
 
         <h4>Pathways</h4>
-        <ul>{''.join(f'<li>{p}</li>' for p in info.get('pathways',[]))}</ul>
+        <ul>{''.join(f'<li>{p}</li>' for p in info.get('pathways', []))}</ul>
 
         <h4>Business Models</h4>
-        <ul>{''.join(f'<li>{bm}</li>' for bm in info.get('business_models',[]))}</ul>
+        <ul>{''.join(f'<li>{bm}</li>' for bm in info.get('business_models', []))}</ul>
 
         <h4>Funding Strategy Fit</h4>
-        <ul>{''.join(f'<li>{fs}</li>' for fs in info.get('funding_strategy',[]))}</ul>
+        <ul>{''.join(f'<li>{fs}</li>' for fs in info.get('funding_strategy', []))}</ul>
         </div>
         """, unsafe_allow_html=True)
-
 
