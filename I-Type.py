@@ -510,4 +510,4 @@ if st.session_state.get("has_results") and archetypes:
 
         <ul>{''.join(f'<li>{fs}</li>' for fs in info.get('funding_strategy',[]))}</ul>
         </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
