@@ -214,6 +214,8 @@ elif step == 2:
 
         if consent:
             st.info("✅ Thank you — your responses will be stored anonymously (no personal data).")
+            
+st.write("DEBUG Final Scores:", final_scores)
 
         # ----------------------------------------------
         # CALC BUTTON
@@ -394,6 +396,8 @@ elif step == 2:
 
                 st.plotly_chart(heat_fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
+                debug_energy = compute_archetype_distances(final_scores, archetypes)
+                st.write("DEBUG energies:", debug_energy["energy"])
 
                 # ----------------------------------------------
                 # DETAILED BREAKDOWN
