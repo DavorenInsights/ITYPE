@@ -314,7 +314,7 @@ elif step == 2:
                             y=row_labels[i],
                             text=f"<b>{archetype}</b><br>{pct:.1f}%",
                             showarrow=False,
-                            font=dict(size=13, color="white"),
+                            font=dict(size=13, color="black"),
                             align="center"
                         ))
                 
