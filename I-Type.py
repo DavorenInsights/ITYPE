@@ -8,6 +8,13 @@ from idix_engine import (
     monte_carlo_probabilities,
 )
 
+# Optional: if data_logger is present, we log; if not, app still runs
+try:
+    from data_logger import log_response
+    HAS_LOGGER = True
+except ImportError:
+    HAS_LOGGER = False
+
 # ============================================================
 # SESSION STATE INITIALISATION
 # ============================================================
@@ -120,6 +127,7 @@ LIKERT_LEGEND = """
 </div>
 """
 
+
 # ============================================================
 # STEP 1 — QUESTIONNAIRE
 # ============================================================
@@ -205,6 +213,26 @@ elif step == 2:
                 shadow_name, shadow_pct = shadow
 
                 # ----------------------------------------------
+                # OPTIONAL: CONSENT + LOGGING (ANONYMOUS)
+                # ----------------------------------------------
+                if HAS_LOGGER:
+                    collect = st.checkbox(
+                        "Allow my anonymous responses to be used to improve the I-TYPE model.",
+                        value=True
+                    )
+                    if collect:
+                        try:
+                            log_response(
+                                final_archetype=primary_name,
+                                stability=stability,
+                                shadow=shadow,
+                                scores=final_scores,
+                                raw_answers=answers
+                            )
+                        except Exception as e:
+                            st.warning(f"Could not log response (internal error): {e}")
+
+                # ----------------------------------------------
                 # HERO CARD + MAIN ARCHETYPE IMAGE
                 # ----------------------------------------------
                 img_path = f"data/archetype_images/{primary_name}.png"
@@ -225,23 +253,22 @@ elif step == 2:
                 """, unsafe_allow_html=True)
 
                 # ----------------------------------------------
-               # ----------------------------------------------
                 # RADAR CHART (FULLY FIXED + CONSISTENT ORDER)
                 # ----------------------------------------------
                 st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
-                
+
                 # enforce correct dimension order
                 dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
-                
+
                 # pull values in correct order
                 vals = [final_scores[d] for d in dims]
-                
+
                 # close polygon for radar shape
                 vals_closed = vals + [vals[0]]
                 dims_closed = dims + [dims[0]]
-                
+
                 radar = go.Figure()
-                
+
                 radar.add_trace(go.Scatterpolar(
                     r=vals_closed,
                     theta=dims_closed,
@@ -251,7 +278,7 @@ elif step == 2:
                     line_width=3,
                     marker=dict(size=6, color="#00eaff")
                 ))
-                
+
                 radar.update_layout(
                     polar=dict(
                         radialaxis=dict(
@@ -271,10 +298,9 @@ elif step == 2:
                     showlegend=False,
                     margin=dict(l=40, r=40, t=30, b=30)
                 )
-                
+
                 st.plotly_chart(radar, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-
 
                 # ----------------------------------------------
                 # IDENTITY SPECTRUM BAR CHART
@@ -298,28 +324,27 @@ elif step == 2:
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 # ----------------------------------------------
-                # ----------------------------------------------
                 # HEATMAP (3×3 ARCHETYPE GRID — POLISHED)
                 # ----------------------------------------------
                 st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
-                
+
                 # 3x3 archetype matrix
                 heat_archetypes = [
                     ["Visionary", "Strategist", "Storyteller"],
                     ["Catalyst", "Apex Innovator", "Integrator"],
                     ["Engineer", "Operator", "Experimenter"]
                 ]
-                
+
                 # probability values
                 heat_values = [
                     [probs.get(a, 0) for a in row]
                     for row in heat_archetypes
                 ]
-                
-                # Row labels (you can rename these)
+
+                # Row + column labels
                 row_labels = ["Ideation Cluster", "Activation Cluster", "Execution Cluster"]
                 col_labels = ["Visionary", "Strategist", "Storyteller"]
-                
+
                 # Create figure
                 heat_fig = go.Figure(data=go.Heatmap(
                     z=heat_values,
@@ -331,7 +356,7 @@ elif step == 2:
                     showscale=True,
                     hoverinfo="skip"
                 ))
-                
+
                 # Add annotations inside each cell
                 annotations = []
                 for i, row in enumerate(heat_archetypes):
@@ -345,7 +370,7 @@ elif step == 2:
                             font=dict(size=13, color="black"),
                             align="center"
                         ))
-                
+
                 heat_fig.update_layout(
                     annotations=annotations,
                     paper_bgcolor="rgba(0,0,0,0)",
@@ -353,14 +378,11 @@ elif step == 2:
                     font=dict(color="#e5f4ff"),
                     title="Identity Heatmap",
                     margin=dict(l=40, r=40, t=60, b=40),
-                    xaxis=dict(side="top")  # cleaner orientation
+                    xaxis=dict(side="top")
                 )
-                
+
                 st.plotly_chart(heat_fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-
-  
-
 
                 # ----------------------------------------------
                 # DETAILED BREAKDOWN
@@ -395,6 +417,13 @@ elif step == 2:
                 - **Heatmap** — where your identity clusters in the 3×3 matrix.  
                 - **Radar chart** — your core innovation dimensions (thinking, execution, risk, motivation, team, commercial).
                 """)
+
+                st.markdown("""
+                <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 1.5rem;">
+                🔒 <b>Privacy:</b> This assessment only stores anonymous responses for model improvement.
+                No names, emails, or identifying details are collected.
+                </p>
+                """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -475,6 +504,10 @@ if st.session_state.get("has_results") and archetypes:
         <ul>{''.join(f'<li>{bm}</li>' for bm in info.get('business_models',[]))}</ul>
 
         <h4>Funding Strategy Fit</h4>
+        <ul>{''.join(f'<li>{fs}</li>' for fs in info.get('funding_strategy',[]))}</ul>
+        </div>
+        """, unsafe_allow_html=True)
+
         <ul>{''.join(f'<li>{fs}</li>' for fs in info.get('funding_strategy',[]))}</ul>
         </div>
         """, unsafe_allow_html=True)
