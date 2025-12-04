@@ -225,28 +225,56 @@ elif step == 2:
                 """, unsafe_allow_html=True)
 
                 # ----------------------------------------------
-                # RADAR CHART
+               # ----------------------------------------------
+                # RADAR CHART (FULLY FIXED + CONSISTENT ORDER)
                 # ----------------------------------------------
                 st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
-
-                dims = list(final_scores.keys())
-                vals = list(final_scores.values())
-
+                
+                # enforce correct dimension order
+                dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
+                
+                # pull values in correct order
+                vals = [final_scores.get(d, 0) for d in dims]
+                
+                # close polygon for radar shape
+                vals_closed = vals + [vals[0]]
+                dims_closed = dims + [dims[0]]
+                
                 radar = go.Figure()
+                
                 radar.add_trace(go.Scatterpolar(
-                    r=vals + [vals[0]],
-                    theta=dims + [dims[0]],
+                    r=vals_closed,
+                    theta=dims_closed,
                     fill='toself',
-                    line_color='#00eaff'
+                    fillcolor='rgba(0,234,255,0.25)',  # subtle neon glow
+                    line_color='#00eaff',
+                    line_width=3,
+                    marker=dict(size=6, color="#00eaff")
                 ))
+                
                 radar.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    polar=dict(
+                        radialaxis=dict(
+                            visible=True,
+                            range=[0, 100],
+                            tickfont=dict(color="#e5f4ff"),
+                            gridcolor="rgba(255,255,255,0.08)",
+                            linewidth=1
+                        ),
+                        angularaxis=dict(
+                            tickfont=dict(color="#e5f4ff"),
+                            gridcolor="rgba(255,255,255,0.08)"
+                        )
+                    ),
                     paper_bgcolor='rgba(0,0,0,0)',
-                    showlegend=False
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    showlegend=False,
+                    margin=dict(l=40, r=40, t=30, b=30)
                 )
-
+                
                 st.plotly_chart(radar, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
+
 
                 # ----------------------------------------------
                 # IDENTITY SPECTRUM BAR CHART
