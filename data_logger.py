@@ -3,7 +3,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import json
 
-SHEET_ID = "111921468957291025718"   # ← replace with your actual sheet ID
+SHEET_ID = "1KkDjnkKBKETEnBNvERbvjFq22ZtHBrFrkJ14m85UXnc"   # ← replace with your actual sheet ID
 
 
 def log_to_google_sheets(final_archetype, stability, shadow, scores, raw_answers):
