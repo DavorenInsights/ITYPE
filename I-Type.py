@@ -73,14 +73,14 @@ archetypes = load_json("data/archetypes.json", default={})
 
 st.markdown("""
 <div class="hero-wrapper">
-  <div class="hero">
-    <div class="hero-glow"></div>
-    <div class="hero-particles"></div>
-    <div class="hero-content">
-      <h1 class="hero-title">I-TYPE — Innovator Type Assessment</h1>
-      <p class="hero-sub">Powered by the Innovator DNA Index™</p>
-    </div>
-  </div>
+<div class="hero">
+<div class="hero-glow"></div>
+<div class="hero-particles"></div>
+<div class="hero-content">
+<h1 class="hero-title">I-TYPE — Innovator Type Assessment</h1>
+<p class="hero-sub">Powered by the Innovator DNA Index™</p>
+</div>
+</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -134,11 +134,11 @@ def get_answers_from_state(questions_list):
 
 LIKERT_LEGEND = """
 <div class="likert-legend">
-  <span>1 = Strongly Disagree</span>
-  <span>2 = Disagree</span>
-  <span>3 = Neutral</span>
-  <span>4 = Agree</span>
-  <span>5 = Strongly Agree</span>
+<span>1 = Strongly Disagree</span>
+<span>2 = Disagree</span>
+<span>3 = Neutral</span>
+<span>4 = Agree</span>
+<span>5 = Strongly Agree</span>
 </div>
 """
 
@@ -254,14 +254,6 @@ elif step == 2:
 
             # STEP 2: MATCH ARCHETYPE
             primary_name, archetype_data = determine_archetype(final_scores, archetypes)
-
-            # DEBUG: raw distances
-            debug_dist = compute_archetype_distances(final_scores, archetypes)
-            st.write("DEBUG — Raw Distances:", debug_dist)
-
-            if primary_name is None or archetype_data is None:
-                st.error("❌ Could not determine archetype.")
-            else:
 
                 # STEP 3: MONTE CARLO
                 probs, stability, shadow = monte_carlo_probabilities(
