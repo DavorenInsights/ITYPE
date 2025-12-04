@@ -1,155 +1,165 @@
+# ===============================================================
+# I-TYPE ENGINE — OPTIMISED ARCHETYPES + CLEAN EUCLIDEAN MODEL
+# ===============================================================
+
 import math
 import random
 
-# ============================================================
-# NORMALISE QUESTIONNAIRE SCORES (1–5 → 0–100)
-# ============================================================
 
-def normalize_scores(answers_dict):
+# ---------------------------------------------------------------
+# NORMALISE RAW QUESTION SCORES (1–5 → 0–100)
+# ---------------------------------------------------------------
+
+def normalize_scores(raw_answers):
     """
-    Converts raw slider values into 0–100 scale per dimension.
-    Structure:
+    Takes raw answer dict:
     {
-        "question": {"value": 1–5, "dimension": "thinking", "reverse": True/False}
+        "question text": {"value": 1–5, "dimension": "...", "reverse": bool},
+        ...
     }
+
+    Produces dimension scores 0–100.
     """
 
-    dim_totals = {
-        "thinking": 0,
-        "execution": 0,
-        "risk": 0,
-        "motivation": 0,
-        "team": 0,
-        "commercial": 0,
+    dims = {
+        "thinking": [],
+        "execution": [],
+        "risk": [],
+        "motivation": [],
+        "team": [],
+        "commercial": [],
     }
-    dim_counts = {k: 0 for k in dim_totals}
 
-    # Combine values per dimension
-    for q, meta in answers_dict.items():
-        value = meta["value"]
-        dim = meta["dimension"]
-        rev = meta.get("reverse", False)
+    for _, info in raw_answers.items():
+        val = info["value"]
 
-        if rev:
-            value = 6 - value  # reverse-coded sliders
+        # Reverse coded → invert 1–5 scale
+        if info.get("reverse", False):
+            val = 6 - val
 
-        dim_totals[dim] += value
-        dim_counts[dim] += 1
+        dims[info["dimension"]].append(val)
 
-    # Convert to percentage
-    out = {}
-    for dim in dim_totals:
-        if dim_counts[dim] == 0:
-            out[dim] = 50  # neutral fallback
+    final_scores = {}
+    for dim, values in dims.items():
+        if not values:
+            final_scores[dim] = 0
         else:
-            avg = dim_totals[dim] / dim_counts[dim]  # in 1–5 range
-            out[dim] = (avg - 1) / 4 * 100  # → 0–100 scale
+            avg = sum(values) / len(values)
+            # Convert from 1–5 to 0–100
+            final_scores[dim] = ((avg - 1) / 4) * 100
 
-    return out
+    return final_scores
 
 
-# ============================================================
-# Z-SCORE NORMALISATION ACROSS ARCHETYPES
-# ============================================================
+# ---------------------------------------------------------------
+# Z-SCORE DISTANCING FOR BETTER PSYCHOMETRIC SEPARATION
+# ---------------------------------------------------------------
 
-def compute_z_scores(user_scores, archetypes):
+def z_distance(user_scores, archetype_sig):
     """
-    Standardises each dimension using archetype means & std.
-    Prevents dimensions with larger variance from dominating.
+    Computes Euclidean distance in Z-space.
+    This prevents dimensions with larger numerical variance from dominating.
     """
 
-    dims = list(user_scores.keys())
+    dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
 
-    # Collect archetype dimension values
-    dim_vals = {d: [] for d in dims}
-    for name, data in archetypes.items():
-        sig = data["signature"]
-        for d in dims:
-            dim_vals[d].append(sig[d])
+    # Standard deviations chosen to balance scale influence
+    # (Prevents Thinking/Execution from overpowering Commercial/Team)
+    stdev = {
+        "thinking": 18,
+        "execution": 18,
+        "risk": 18,
+        "motivation": 18,
+        "team": 18,
+        "commercial": 18,
+    }
 
-    # Compute µ and σ for each dimension
-    dim_mean = {}
-    dim_std = {}
-
+    acc = 0
     for d in dims:
-        arr = dim_vals[d]
-        mean = sum(arr) / len(arr)
-        var = sum((v - mean) ** 2 for v in arr) / len(arr)
-        std = max(math.sqrt(var), 1e-6)  # avoid zero division
-        dim_mean[d] = mean
-        dim_std[d] = std
+        diff = (user_scores[d] - archetype_sig[d]) / stdev[d]
+        acc += diff * diff
 
-    # Convert user to z-scores
-    user_z = {d: (user_scores[d] - dim_mean[d]) / dim_std[d] for d in dims}
-
-    # Convert archetypes to z-scores
-    arch_z = {}
-    for name, data in archetypes.items():
-        sig = data["signature"]
-        arch_z[name] = {
-            d: (sig[d] - dim_mean[d]) / dim_std[d]
-            for d in dims
-        }
-
-    return user_z, arch_z
+    return math.sqrt(acc)
 
 
-# ============================================================
-# DETERMINE PRIMARY ARCHETYPE (Z-SPACE EUCLIDEAN)
-# ============================================================
+# ---------------------------------------------------------------
+# DETERMINE CLOSEST ARCHETYPE USING Z-DIST EUCLIDEAN
+# ---------------------------------------------------------------
 
-def determine_archetype(final_scores, archetypes):
-    """
-    Returns (best_name, archetype_data)
-    """
-
-    user_z, arch_z = compute_z_scores(final_scores, archetypes)
-
+def determine_archetype(scores, archetypes):
     best_name = None
     best_dist = float("inf")
     best_data = None
 
-    for name, zd in arch_z.items():
-        dist = math.sqrt(sum((user_z[d] - zd[d]) ** 2 for d in user_z))
+    for name, data in archetypes.items():
+        sig = data.get("signature", {})
+        if not sig:
+            continue
+
+        dist = z_distance(scores, sig)
 
         if dist < best_dist:
             best_dist = dist
             best_name = name
-            best_data = archetypes[name]
+            best_data = data
 
     return best_name, best_data
 
 
-# ============================================================
-# MONTE CARLO — IDENTITY STABILITY & SHADOW ARCHETYPE
-# ============================================================
+# ---------------------------------------------------------------
+# MONTE-CARLO — IDENTITY STABILITY + SHADOW ARCHETYPE
+# ---------------------------------------------------------------
 
-def monte_carlo_probabilities(base_scores, archetypes, runs=5000, noise=0.07):
+def monte_carlo_probabilities(base_scores, archetypes, runs=5000, noise=0.06):
     """
-    noise=0.07 → ±7% standard deviation (on 0–100 scale)
+    Adds Gaussian noise (±6%) to user scores and reclassifies.
+    Determines:
+      • Identity stability
+      • Probability distribution
+      • Shadow archetype
     """
 
-    counts = {name: 0 for name in archetypes}
+    names = list(archetypes.keys())
+    counts = {name: 0 for name in names}
 
     for _ in range(runs):
-        # Perturb each dimension
-        perturbed = {
-            d: max(0, min(100, base_scores[d] + random.gauss(0, noise * 100)))
-            for d in base_scores
-        }
+
+        perturbed = {}
+
+        for dim, val in base_scores.items():
+            delta = random.gauss(0, noise * 100)
+            perturbed[dim] = max(0, min(100, val + delta))
 
         name, _ = determine_archetype(perturbed, archetypes)
         counts[name] += 1
 
     total = sum(counts.values())
-    probs = {a: (counts[a] / total) * 100 for a in counts}
+    probs = {name: (counts[name] / total) * 100 for name in names}
 
     # Primary
     primary = max(probs, key=probs.get)
     stability = probs[primary]
 
-    # Shadow
-    ordered = sorted(probs.items(), key=lambda x: x[1], reverse=True)
-    shadow = ordered[1] if len(ordered) > 1 else ("None", 0)
+    # Shadow = second most likely
+    sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
+    shadow = sorted_probs[1] if len(sorted_probs) > 1 else ("None", 0)
 
     return probs, stability, shadow
+
+
+# ---------------------------------------------------------------
+# OPTIONAL — RAW DISTANCE DIAGNOSTICS FOR DEBUGGING
+# ---------------------------------------------------------------
+
+def compute_archetype_distances(scores, archetypes):
+    """
+    Returns raw z-distances to all archetypes.
+    Debugging: lets you see how close each one was.
+    """
+
+    out = {}
+    for name, data in archetypes.items():
+        sig = data["signature"]
+        out[name] = z_distance(scores, sig)
+
+    return out
