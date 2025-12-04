@@ -10,7 +10,8 @@ from idix_engine import (
 
 # Optional anonymous logging
 try:
-    from data_logger import log_response
+    from data_logger_sheets import log_to_google_sheets as log_response
+
     HAS_LOGGER = True
 except ImportError:
     HAS_LOGGER = False
