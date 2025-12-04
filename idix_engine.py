@@ -1,140 +1,75 @@
+# ============================================================
+# I-TYPE ENGINE (FINAL FIXED VERSION)
+# ============================================================
+
 import math
 import random
-from typing import Dict, Tuple, Any
 
 
 # ============================================================
-# CORE DIMENSIONS + WEIGHTS (MODEL B — WEIGHTED EUCLIDEAN)
+# 1. NORMALISE SCORES (SUM-BASED, NOT AVERAGE-BASED)
 # ============================================================
 
-DIMENSIONS = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
-
-# Heavier weight on thinking + execution, medium on risk + motivation,
-# slightly lower on team + commercial: reflects innovation reality
-DIM_WEIGHTS = {
-    "thinking": 1.2,
-    "execution": 1.2,
-    "risk": 1.0,
-    "motivation": 1.0,
-    "team": 0.8,
-    "commercial": 0.8,
-}
-
-
-# ============================================================
-# 1) NORMALISE RAW QUESTION SCORES (1–5 → 0–100)
-# ============================================================
-
-def normalize_scores(raw_answers: Dict[str, Dict[str, Any]]) -> Dict[str, float]:
+def normalize_scores(raw_answers):
     """
-    Convert raw question answers (1–5 Likert) into 0–100 scores
-    for each innovation dimension.
-
-    raw_answers structure:
-    {
-        "question text": {
-            "value": int 1–5,
-            "dimension": "thinking" | "execution" | ...,
-            "reverse": bool
-        },
-        ...
-    }
-
-    Scaling:
-        1 → 0
-        3 → 50
-        5 → 100
+    Converts raw 1–5 values (with reverse scoring) into
+    dimension totals and then scales each dimension to 0–100.
+    This preserves variance and prevents archetype collapse.
     """
-    dims = {d: [] for d in DIMENSIONS}
 
-    for _, info in raw_answers.items():
-        dim = info.get("dimension")
-        if dim not in dims:
-            # ignore unknown dimensions defensively
-            continue
+    dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
 
-        val = info.get("value", 3)
+    scores = {d: 0 for d in dims}
+    counts = {d: 0 for d in dims}
 
-        # Reverse-coded questions: 1 ↔ 5, 2 ↔ 4, 3 ↔ 3
-        if info.get("reverse", False):
-            val = 6 - val
+    # SUM raw scores per dimension (after reverse coding)
+    for entry in raw_answers.values():
+        dim = entry["dimension"]
+        val = entry["value"]
 
-        # clamp just in case
-        val = max(1, min(5, val))
-        dims[dim].append(val)
+        if entry.get("reverse", False):
+            val = 6 - val  # reverse Likert
 
-    final_scores: Dict[str, float] = {}
+        scores[dim] += val
+        counts[dim] += 1
 
-    for d, values in dims.items():
-        if not values:
-            final_scores[d] = 0.0
+    # Convert to percent-of-maximum
+    final_scores = {}
+    for d in dims:
+        max_score = counts[d] * 5
+        if max_score == 0:
+            final_scores[d] = 50  # neutral fallback
         else:
-            avg = sum(values) / len(values)  # average 1–5
-            # map 1–5 to 0–100 linearly
-            final_scores[d] = ((avg - 1.0) / 4.0) * 100.0
+            final_scores[d] = (scores[d] / max_score) * 100
 
     return final_scores
 
 
 # ============================================================
-# 2) WEIGHTED EUCLIDEAN DISTANCE
+# 2. ARCHETYPE MATCHING — TRUE EUCLIDEAN DISTANCE
 # ============================================================
 
-def _weighted_distance(
-    scores: Dict[str, float],
-    signature: Dict[str, float],
-    weights: Dict[str, float] = DIM_WEIGHTS,
-) -> float:
+def determine_archetype(scores, archetypes):
     """
-    Compute weighted Euclidean distance between user scores and an archetype signature.
-
-    d = sqrt( Σ w_d * (score_d - sig_d)^2 )
-    Only uses dimensions present in both user scores and signature.
+    Selects the archetype whose signature vector is closest
+    to the user's score vector using Euclidean distance.
     """
-    total = 0.0
-    used_dims = 0
 
-    for dim, w in weights.items():
-        if dim not in scores or dim not in signature:
-            continue
-        diff = scores[dim] - signature[dim]
-        total += w * (diff ** 2)
-        used_dims += 1
-
-    if used_dims == 0:
-        # no overlapping dimensions → treat as infinitely far
-        return float("inf")
-
-    return math.sqrt(total)
-
-
-# ============================================================
-# 3) ARCHETYPE MATCHING
-# ============================================================
-
-def determine_archetype(
-    scores: Dict[str, float],
-    archetypes: Dict[str, Dict[str, Any]],
-) -> Tuple[str, Dict[str, Any]]:
-    """
-    Determine the best-fit archetype given final dimension scores (0–100)
-    using weighted Euclidean distance.
-
-    Returns:
-        (best_name, archetype_data)
-
-    If no archetype can be matched, returns (None, None).
-    """
     best_name = None
     best_dist = float("inf")
-    best_data: Dict[str, Any] = None
+    best_data = None
 
     for name, data in archetypes.items():
-        signature = data.get("signature", {})
-        if not isinstance(signature, dict) or not signature:
+
+        sig = data.get("signature", {})
+        dims = set(scores.keys()) & set(sig.keys())
+
+        if not dims:
             continue
 
-        dist = _weighted_distance(scores, signature)
+        dist = math.sqrt(sum(
+            (scores[d] - sig[d]) ** 2 for d in dims
+        ))
 
         if dist < best_dist:
             best_dist = dist
@@ -145,84 +80,61 @@ def determine_archetype(
 
 
 # ============================================================
-# 4) MONTE CARLO PROBABILITIES (IDENTITY SPECTRUM)
+# 3. MONTE CARLO STABILITY TEST
 # ============================================================
 
-def monte_carlo_probabilities(
-    base_scores: Dict[str, float],
-    archetypes: Dict[str, Dict[str, Any]],
-    runs: int = 5000,
-    noise: float = 0.07,
-) -> Tuple[Dict[str, float], float, Tuple[str, float]]:
+def monte_carlo_probabilities(base_scores, archetypes, runs=5000, noise=0.10):
     """
-    Run Monte Carlo simulations to estimate how stable the archetype is.
-
-    For each run:
-        - Add Gaussian noise (mean 0, std = noise * 100) to each dimension.
-        - Clamp scores to [0, 100].
-        - Recompute the best-fit archetype via weighted Euclidean distance.
-
-    Returns:
-        probs: dict of archetype → probability (%) across all runs.
-        stability: primary archetype probability (%).
-        shadow: (2nd_best_name, 2nd_best_probability).
+    Runs perturbations of user scores to estimate:
+      - Identity stability
+      - Full identity distribution
+      - Shadow archetype
     """
-    if not archetypes:
-        return {}, 0.0, ("None", 0.0)
 
-    counts = {name: 0 for name in archetypes.keys()}
+    counts = {name: 0 for name in archetypes}
 
     for _ in range(runs):
-        perturbed = {}
 
-        for dim in DIMENSIONS:
-            val = base_scores.get(dim, 0.0)
-            delta = random.gauss(0.0, noise * 100.0)
-            perturbed_val = max(0.0, min(100.0, val + delta))
-            perturbed[dim] = perturbed_val
+        perturbed = {}
+        for dim, val in base_scores.items():
+            delta = random.gauss(0, noise * 100)   # ±10% variation
+            perturbed[dim] = max(0, min(100, val + delta))
 
         name, _ = determine_archetype(perturbed, archetypes)
-        if name is not None:
-            counts[name] += 1
+        counts[name] += 1
 
-    total = sum(counts.values()) or 1  # avoid divide-by-zero
-    probs = {a: (c / total) * 100.0 for a, c in counts.items()}
+    total = sum(counts.values())
+    probs = {a: (c / total) * 100 for a, c in counts.items()}
 
-    # Primary archetype
+    # Determine primary
     primary = max(probs, key=probs.get)
     stability = probs[primary]
 
-    # Shadow archetype (2nd place)
+    # Shadow
     sorted_probs = sorted(probs.items(), key=lambda x: x[1], reverse=True)
-    if len(sorted_probs) > 1:
-        shadow = sorted_probs[1]
-    else:
-        shadow = ("None", 0.0)
+    shadow = sorted_probs[1] if len(sorted_probs) > 1 else ("None", 0)
 
     return probs, stability, shadow
 
 
 # ============================================================
-# 5) OPTIONAL DIAGNOSTIC: RAW DISTANCES
+# 4. OPTIONAL — DISTANCE MATRIX (FOR HEATMAP DEBUGGING)
 # ============================================================
 
-def compute_archetype_distances(
-    scores: Dict[str, float],
-    archetypes: Dict[str, Dict[str, Any]],
-) -> Dict[str, float]:
+def compute_archetype_distances(scores, archetypes):
     """
-    Returns a dictionary of weighted Euclidean distances from the user scores
-    to each archetype signature. Smaller = closer.
-
-    Useful for debugging geometry or building advanced visualisations.
+    Returns raw Euclidean distances — used for diagnostics.
     """
-    distances: Dict[str, float] = {}
+    distances = {}
 
     for name, data in archetypes.items():
-        sig = data.get("signature", {})
-        if not isinstance(sig, dict) or not sig:
-            continue
+        sig = data["signature"]
+        dims = set(scores.keys()) & set(sig.keys())
 
-        distances[name] = _weighted_distance(scores, sig)
+        dist = math.sqrt(sum(
+            (scores[d] - sig[d]) ** 2 for d in dims
+        ))
+
+        distances[name] = dist
 
     return distances
