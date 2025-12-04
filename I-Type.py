@@ -213,24 +213,35 @@ elif step == 2:
                 shadow_name, shadow_pct = shadow
 
                 # ----------------------------------------------
-                # OPTIONAL: CONSENT + LOGGING (ANONYMOUS)
                 # ----------------------------------------------
-                if HAS_LOGGER:
-                    collect = st.checkbox(
-                        "Allow my anonymous responses to be used to improve the I-TYPE model.",
-                        value=True
-                    )
-                    if collect:
-                        try:
-                            log_response(
-                                final_archetype=primary_name,
-                                stability=stability,
-                                shadow=shadow,
-                                scores=final_scores,
-                                raw_answers=answers
-                            )
-                        except Exception as e:
-                            st.warning(f"Could not log response (internal error): {e}")
+                # SAVE ANONYMOUS DATA IF CONSENT GIVEN
+                # ----------------------------------------------
+                if consent:
+                    import pandas as pd
+                    import os
+                
+                    save_path = "data/itype_responses.csv"
+                
+                    # Create folder if missing
+                    os.makedirs("data", exist_ok=True)
+                
+                    # Build one-row record
+                    record = {
+                        "archetype": primary_name,
+                        "shadow": shadow_name,
+                        "stability": round(stability, 2),
+                        **{f"dim_{k}": v for k, v in final_scores.items()}
+                    }
+                
+                    # Append or create new file
+                    if os.path.exists(save_path):
+                        df = pd.read_csv(save_path)
+                        df = df.append(record, ignore_index=True)
+                    else:
+                        df = pd.DataFrame([record])
+                
+                    df.to_csv(save_path, index=False)
+
 
                 # ----------------------------------------------
                 # HERO CARD + MAIN ARCHETYPE IMAGE
