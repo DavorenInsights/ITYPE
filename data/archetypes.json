@@ -3,10 +3,10 @@
     "description": "You imagine future possibilities, connect dots others can't see, and gravitate toward high-upside, bold concepts.",
     "signature": {
       "thinking": 90,
-      "execution": 40,
+      "execution": 50,
       "risk": 80,
       "motivation": 75,
-      "team": 50,
+      "team": 55,
       "commercial": 45
     },
     "strengths": [
@@ -29,7 +29,7 @@
     "signature": {
       "thinking": 65,
       "execution": 80,
-      "risk": 60,
+      "risk": 55,
       "motivation": 90,
       "team": 60,
       "commercial": 55
@@ -53,7 +53,7 @@
     "signature": {
       "thinking": 60,
       "execution": 95,
-      "risk": 35,
+      "risk": 40,
       "motivation": 65,
       "team": 55,
       "commercial": 45
@@ -76,10 +76,10 @@
     "description": "You think in terms of markets, value, and long-term positioning. You optimise for impact and big-picture clarity.",
     "signature": {
       "thinking": 80,
-      "execution": 55,
+      "execution": 60,
       "risk": 40,
-      "motivation": 60,
-      "team": 60,
+      "motivation": 65,
+      "team": 55,
       "commercial": 90
     },
     "strengths": [
@@ -99,7 +99,7 @@
   "Experimenter": {
     "description": "You learn by trying, testing, and iterating. You thrive in ambiguity and adapt rapidly.",
     "signature": {
-      "thinking": 75,
+      "thinking": 70,
       "execution": 60,
       "risk": 85,
       "motivation": 65,
@@ -123,12 +123,12 @@
   "Integrator": {
     "description": "You bring people, ideas, and systems together, balancing innovation with practicality.",
     "signature": {
-      "thinking": 60,
-      "execution": 60,
-      "risk": 45,
-      "motivation": 55,
+      "thinking": 65,
+      "execution": 65,
+      "risk": 50,
+      "motivation": 65,
       "team": 90,
-      "commercial": 55
+      "commercial": 60
     },
     "strengths": [
       "Excellent team facilitation",
@@ -148,10 +148,10 @@
     "description": "You run systems smoothly, optimise processes, and ensure reliability in innovation environments.",
     "signature": {
       "thinking": 55,
-      "execution": 85,
+      "execution": 80,
       "risk": 30,
       "motivation": 60,
-      "team": 75,
+      "team": 80,
       "commercial": 50
     },
     "strengths": [
@@ -172,7 +172,7 @@
     "description": "You translate complex ideas into compelling narratives that win support and build momentum.",
     "signature": {
       "thinking": 70,
-      "execution": 45,
+      "execution": 50,
       "risk": 45,
       "motivation": 90,
       "team": 70,
@@ -195,12 +195,12 @@
   "Apex Innovator": {
     "description": "You combine exceptional creativity, execution strength, commercial intuition, and resilience. You operate at the apex of innovation capability: fast, adaptable, and deeply strategic.",
     "signature": {
-      "thinking": 95,
-      "execution": 95,
-      "risk": 85,
-      "motivation": 95,
-      "team": 90,
-      "commercial": 90
+      "thinking": 92,
+      "execution": 92,
+      "risk": 82,
+      "motivation": 92,
+      "team": 88,
+      "commercial": 88
     },
     "strengths": [
       "Elite-level creative and analytical ability",
