@@ -271,56 +271,68 @@ elif step == 2:
 
                 # ----------------------------------------------
                 # ----------------------------------------------
-# HEATMAP (3×3 GRID) WITH ARCHETYPE LABELS
-# ----------------------------------------------
-st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
+                # HEATMAP (3×3 ARCHETYPE GRID — POLISHED)
+                # ----------------------------------------------
+                st.markdown("<div class='itype-chart-box'>", unsafe_allow_html=True)
+                
+                # 3x3 archetype matrix
+                heat_archetypes = [
+                    ["Visionary", "Strategist", "Storyteller"],
+                    ["Catalyst", "Apex Innovator", "Integrator"],
+                    ["Engineer", "Operator", "Experimenter"]
+                ]
+                
+                # probability values
+                heat_values = [
+                    [probs.get(a, 0) for a in row]
+                    for row in heat_archetypes
+                ]
+                
+                # Row labels (you can rename these)
+                row_labels = ["Ideation Cluster", "Activation Cluster", "Execution Cluster"]
+                col_labels = ["Visionary", "Strategist", "Storyteller"]
+                
+                # Create figure
+                heat_fig = go.Figure(data=go.Heatmap(
+                    z=heat_values,
+                    x=col_labels,
+                    y=row_labels,
+                    colorscale="blues",
+                    zmin=0,
+                    zmax=max([max(row) for row in heat_values] + [1]),  # ensure scale
+                    showscale=True,
+                    hoverinfo="skip"
+                ))
+                
+                # Add annotations inside each cell
+                annotations = []
+                for i, row in enumerate(heat_archetypes):
+                    for j, archetype in enumerate(row):
+                        pct = probs.get(archetype, 0)
+                        annotations.append(dict(
+                            x=col_labels[j],
+                            y=row_labels[i],
+                            text=f"<b>{archetype}</b><br>{pct:.1f}%",
+                            showarrow=False,
+                            font=dict(size=13, color="white"),
+                            align="center"
+                        ))
+                
+                heat_fig.update_layout(
+                    annotations=annotations,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#e5f4ff"),
+                    title="Identity Heatmap",
+                    margin=dict(l=40, r=40, t=60, b=40),
+                    xaxis=dict(side="top")  # cleaner orientation
+                )
+                
+                st.plotly_chart(heat_fig, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
-heat_archetypes = [
-    ["Visionary", "Strategist", "Storyteller"],
-    ["Catalyst", "Apex Innovator", "Integrator"],
-    ["Engineer", "Operator", "Experimenter"]
-]
+  
 
-# Probability values for each block
-heat_values = [
-    [probs.get(a, 0) for a in row]
-    for row in heat_archetypes
-]
-
-# Create annotated heatmap
-heat_fig = go.Figure()
-
-heat_fig.add_trace(go.Heatmap(
-    z=heat_values,
-    x=[ "Visionary", "Strategist", "Storyteller" ],
-    y=[ "Catalyst Row", "Engineer Row", "Operator Row" ],  # custom row names
-    text=[[f"{a}<br>{probs.get(a,0):.1f}%" for a in row] for row in heat_archetypes],
-    hoverinfo="text",
-    colorscale="blues",
-    showscale=True
-))
-
-# Add annotations inside each block
-annotations = []
-for i, row in enumerate(heat_archetypes):
-    for j, archetype in enumerate(row):
-        annotations.append(dict(
-            x=[ "Visionary", "Strategist", "Storyteller" ][j],
-            y=[ "Catalyst Row", "Engineer Row", "Operator Row" ][i],
-            text=f"{archetype}<br>{probs.get(archetype,0):.1f}%",
-            showarrow=False,
-            font=dict(color="#ffffff", size=12)
-        ))
-
-heat_fig.update_layout(
-    annotations=annotations,
-    paper_bgcolor='rgba(0,0,0,0)',
-    font=dict(color="#e5f4ff"),
-    title="Identity Heatmap (Archetype Probability Grid)"
-)
-
-st.plotly_chart(heat_fig, use_container_width=True)
-st.markdown("</div>", unsafe_allow_html=True)
 
                 # ----------------------------------------------
                 # DETAILED BREAKDOWN
