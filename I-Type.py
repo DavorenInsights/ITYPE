@@ -234,7 +234,7 @@ elif step == 2:
                 dims = ["thinking", "execution", "risk", "motivation", "team", "commercial"]
                 
                 # pull values in correct order
-                vals = [final_scores.get(d, 0) for d in dims]
+                vals = [final_scores[d] for d in dims]
                 
                 # close polygon for radar shape
                 vals_closed = vals + [vals[0]]
