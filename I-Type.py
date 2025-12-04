@@ -6,7 +6,7 @@ from idix_engine import (
     normalize_scores,
     determine_archetype,
     monte_carlo_probabilities,
-    compute_archetype_distances,   # <-- ADD THIS
+    compute_archetype_distances,
 )
 
 # Optional: anonymous logging (safe if file missing)
@@ -15,6 +15,7 @@ try:
     HAS_LOGGER = True
 except ImportError:
     HAS_LOGGER = False
+
 
 # ============================================================
 # SESSION STATE INITIALISATION
@@ -29,6 +30,10 @@ if "has_results" not in st.session_state:
 if "open_archetype" not in st.session_state:
     st.session_state["open_archetype"] = None
 
+# persistent answer store (fixed)
+if "answers" not in st.session_state:
+    st.session_state["answers"] = {}
+
 
 # ============================================================
 # LOAD CSS
@@ -40,6 +45,7 @@ def load_css():
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning("⚠ Missing CSS file: assets/styles.css")
+
 
 load_css()
 
@@ -56,6 +62,7 @@ def load_json(path, default=None):
         st.error(f"Error loading {path}: {e}")
         return default
 
+
 questions = load_json("data/questions.json", default=[])
 archetypes = load_json("data/archetypes.json", default={})
 
@@ -66,14 +73,14 @@ archetypes = load_json("data/archetypes.json", default={})
 
 st.markdown("""
 <div class="hero-wrapper">
-<div class="hero">
-<div class="hero-glow"></div>
-<div class="hero-particles"></div>
-<div class="hero-content">
-<h1 class="hero-title">I-TYPE — Innovator Type Assessment</h1>
-<p class="hero-sub">Powered by the Innovator DNA Index™</p>
-</div>
-</div>
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-particles"></div>
+    <div class="hero-content">
+      <h1 class="hero-title">I-TYPE — Innovator Type Assessment</h1>
+      <p class="hero-sub">Powered by the Innovator DNA Index™</p>
+    </div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -95,24 +102,29 @@ st.progress(step / total_steps)
 
 
 # ============================================================
-# HELPERS TO RECONSTRUCT ANSWERS FROM STATE
+# HELPERS TO RECONSTRUCT ANSWERS FROM STATE (FIXED)
 # ============================================================
 
 def get_answers_from_state(questions_list):
     """
-    Rebuilds the `answers` dict from stored slider values in session_state.
+    Builds the answers dict from st.session_state["answers"]
+    and the questions configuration.
     """
     answers = {}
     for i, q in enumerate(questions_list):
-        text = q.get("question", f"Question {i+1}")
-        dim = q.get("dimension", "thinking")
-        reverse = q.get("reverse", False)
-        val = st.session_state.get(f"q{i}", 3)
-        answers[text] = {
+        key = f"q{i}"
+        val = st.session_state["answers"].get(key)
+
+        if val is None:
+            # As a fallback, default to 3 (neutral)
+            val = 3
+
+        answers[q["question"]] = {
             "value": val,
-            "dimension": dim,
-            "reverse": reverse,
+            "dimension": q.get("dimension", "thinking"),
+            "reverse": q.get("reverse", False),
         }
+
     return answers
 
 
@@ -122,11 +134,11 @@ def get_answers_from_state(questions_list):
 
 LIKERT_LEGEND = """
 <div class="likert-legend">
-<span>1 = Strongly Disagree</span>
-<span>2 = Disagree</span>
-<span>3 = Neutral</span>
-<span>4 = Agree</span>
-<span>5 = Strongly Agree</span>
+  <span>1 = Strongly Disagree</span>
+  <span>2 = Disagree</span>
+  <span>3 = Neutral</span>
+  <span>4 = Agree</span>
+  <span>5 = Strongly Agree</span>
 </div>
 """
 
@@ -148,19 +160,22 @@ if step == 1:
             # Question block
             st.markdown(f"""
             <div class="itype-question">
-            <p><b>{text}</b></p>
+              <p><b>{text}</b></p>
             </div>
             """, unsafe_allow_html=True)
 
-            # Slider directly below question
-            st.slider(
+            # Slider directly below question (FIXED: use persistent answers store)
+            value = st.slider(
                 label="",
                 min_value=1,
                 max_value=5,
-                value=st.session_state.get(f"q{i}", 3),
+                value=st.session_state["answers"].get(f"q{i}", 3),
                 key=f"q{i}",
                 help="1 = Strongly Disagree · 5 = Strongly Agree"
             )
+
+            # Persist in answers dict
+            st.session_state["answers"][f"q{i}"] = value
 
             st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
@@ -168,26 +183,33 @@ if step == 1:
 
     col1, col2 = st.columns(2)
 
+    # Reset all answers + state
     with col1:
         if st.button("Reset"):
-            # Clear all answers
+            # Clear all question values
             for key in list(st.session_state.keys()):
                 if key.startswith("q"):
                     del st.session_state[key]
+
+            st.session_state["answers"] = {}
             st.session_state["step"] = 1
             st.session_state["has_results"] = False
             st.session_state["open_archetype"] = None
             st.rerun()
 
+    # Move to Step 2 and freeze answers
     with col2:
         if st.button("Next ➜ See My Results"):
+            # Persist all current sliders into answers store
+            for i in range(len(questions)):
+                st.session_state["answers"][f"q{i}"] = st.session_state.get(f"q{i}", 3)
+
             st.session_state["step"] = 2
             st.rerun()
 
 
 # ============================================================
-# ============================================================
-# STEP 2 — RESULTS (FULLY FIXED BLOCK)
+# STEP 2 — RESULTS
 # ============================================================
 
 elif step == 2:
@@ -221,29 +243,33 @@ elif step == 2:
         calc = st.button("🚀 Calculate My Innovator Type")
 
         if calc:
-
             st.session_state["has_results"] = True
             st.session_state["open_archetype"] = None
 
             # STEP 1: NORMALISE SCORES
             final_scores = normalize_scores(answers)
 
-            # DEBUG
+            # DEBUG OUTPUT
             st.write("DEBUG — Final Scores (0–100):", final_scores)
 
             # STEP 2: MATCH ARCHETYPE
             primary_name, archetype_data = determine_archetype(final_scores, archetypes)
 
-            # DEBUG
-            import pprint
-            st.write("DEBUG — Raw Distances:", compute_archetype_distances(final_scores, archetypes))
+            # DEBUG: raw distances
+            debug_dist = compute_archetype_distances(final_scores, archetypes)
+            st.write("DEBUG — Raw Distances:", debug_dist)
 
-            if primary_name is None:
+            if primary_name is None or archetype_data is None:
                 st.error("❌ Could not determine archetype.")
             else:
 
                 # STEP 3: MONTE CARLO
-                probs, stability, shadow = monte_carlo_probabilities(final_scores, archetypes)
+                probs, stability, shadow = monte_carlo_probabilities(
+                    final_scores,
+                    archetypes
+                )
+
+                shadow_name, shadow_pct = shadow
 
                 # LOGGING
                 if HAS_LOGGER and consent:
@@ -257,48 +283,6 @@ elif step == 2:
                         )
                     except Exception as e:
                         st.warning(f"Logging failed: {e}")
-
-                # ----------------------------------------------
-                # RESULTS CARD
-                # ----------------------------------------------
-                img_path = f"data/archetype_images/{primary_name}.png"
-
-                try:
-                    st.image(img_path, use_column_width=False)
-                except:
-                    pass
-
-                st.markdown(f"""
-                <div class="itype-result-card">
-                <h1>{primary_name}</h1>
-                <p>{archetype_data['description']}</p>
-                <p><b>Stability:</b> {stability:.1f}%</p>
-                <p><b>Shadow Archetype:</b> {shadow[0]} ({shadow[1]:.1f}%)</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # ----------------------------------------------
-                # RADAR, HEATMAP, BAR CHARTS
-                # (unchanged from your version — fully working)
-                # ----------------------------------------------
-
-                # keep your original visual code here (unchanged)
-
-
-                # ----------------------------------------------
-                # ANONYMOUS LOGGING IF ALLOWED
-                # ----------------------------------------------
-                if HAS_LOGGER and consent:
-                    try:
-                        log_response(
-                            final_archetype=primary_name,
-                            stability=stability,
-                            shadow=shadow,
-                            scores=final_scores,
-                            raw_answers=answers
-                        )
-                    except Exception as e:
-                        st.warning(f"Could not log response (internal error): {e}")
 
                 # ----------------------------------------------
                 # HERO CARD + MAIN ARCHETYPE IMAGE
@@ -380,7 +364,10 @@ elif step == 2:
                 ))
                 bar_fig.update_layout(
                     paper_bgcolor='rgba(0,0,0,0)',
-                    yaxis_title="Probability (%)"
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    yaxis_title="Probability (%)",
+                    xaxis_title="Archetype",
+                    font=dict(color="#e5f4ff")
                 )
 
                 st.plotly_chart(bar_fig, use_container_width=True)
@@ -442,8 +429,11 @@ elif step == 2:
 
                 st.plotly_chart(heat_fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
+
+                # Optional extra debug
                 debug_energy = compute_archetype_distances(final_scores, archetypes)
-                st.write("DEBUG energies:", debug_energy["energy"])
+                if isinstance(debug_energy, dict) and "energy" in debug_energy:
+                    st.write("DEBUG energies:", debug_energy["energy"])
 
                 # ----------------------------------------------
                 # DETAILED BREAKDOWN
@@ -452,32 +442,42 @@ elif step == 2:
 
                 st.markdown("<h3>Strengths</h3>", unsafe_allow_html=True)
                 for s in archetype_data.get("strengths", []):
-                    st.markdown(f"<div class='itype-strength-card'>• {s}</div>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='itype-strength-card'>• {s}</div>",
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown("<h3 style='margin-top:20px;'>Growth Edges & Risks</h3>",
                             unsafe_allow_html=True)
                 for r in archetype_data.get("risks", []):
-                    st.markdown(f"<div class='itype-risk-card'>• {r}</div>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='itype-risk-card'>• {r}</div>",
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown("<h3 style='margin-top:20px;'>Recommended Innovation Pathways</h3>",
                             unsafe_allow_html=True)
                 for pth in archetype_data.get("pathways", []):
-                    st.markdown(f"<div class='itype-pathway-card'>• {pth}</div>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='itype-pathway-card'>• {pth}</div>",
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown("<h3 style='margin-top:20px;'>Suggested Business Models</h3>",
                             unsafe_allow_html=True)
                 for bm in archetype_data.get("business_models", []):
-                    st.markdown(f"<div class='itype-business-card'>• {bm}</div>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='itype-business-card'>• {bm}</div>",
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown("<h3 style='margin-top:20px;'>Funding Strategy Fit</h3>",
                             unsafe_allow_html=True)
                 for fs in archetype_data.get("funding_strategy", []):
-                    st.markdown(f"<div class='itype-funding-card'>• {fs}</div>",
-                                unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='itype-funding-card'>• {fs}</div>",
+                        unsafe_allow_html=True
+                    )
 
                 st.markdown("<hr><h3>How to Interpret Your Results</h3>", unsafe_allow_html=True)
                 st.markdown("""
@@ -485,13 +485,13 @@ elif step == 2:
                 - **Shadow archetype** — your second-strongest identity.  
                 - **Identity spectrum** — how your profile spreads across all archetypes.  
                 - **Heatmap** — how you cluster in the 3×3 innovation matrix.  
-                - **Radar chart** — your core innovation dimensions: 
+                - **Radar chart** — your core innovation dimensions:
                   thinking, execution, risk, motivation, team, commercial.
                 """)
 
                 st.markdown("""
                 <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 1.5rem;">
-                  🔒 <b>Privacy:</b> Only numeric scores are stored (if you opt in). 
+                  🔒 <b>Privacy:</b> Only numeric scores are stored (if you opt in).
                   No names, emails, or identifying details are collected.
                 </p>
                 """, unsafe_allow_html=True)
@@ -512,6 +512,7 @@ elif step == 2:
             for key in list(st.session_state.keys()):
                 if key.startswith("q"):
                     del st.session_state[key]
+            st.session_state["answers"] = {}
             st.session_state["step"] = 1
             st.session_state["has_results"] = False
             st.session_state["open_archetype"] = None
@@ -523,7 +524,6 @@ elif step == 2:
 # ============================================================
 
 if st.session_state.get("has_results") and archetypes:
-
     if "open_archetype" not in st.session_state:
         st.session_state["open_archetype"] = None
 
@@ -545,7 +545,7 @@ if st.session_state.get("has_results") and archetypes:
 
     selected = st.session_state["open_archetype"]
 
-    if selected is not None:
+    if selected is not None and selected in archetypes:
         img_path = f"data/archetype_images/{selected}.png"
 
         try:
