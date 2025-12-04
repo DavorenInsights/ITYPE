@@ -240,5 +240,18 @@
     "question": "I can recognise when an idea is worth investing in.",
     "dimension": "commercial",
     "reverse": false
-  }
+  },
+  {
+  "id": 41,
+  "question": "I often struggle to generate creative solutions.",
+  "dimension": "thinking",
+  "reverse": true
+},
+{
+  "id": 42,
+  "question": "I find it hard to spot patterns unless they are obvious.",
+  "dimension": "thinking",
+  "reverse": true
+}
+
 ]
