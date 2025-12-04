@@ -282,28 +282,58 @@ elif step == 2:
             st.plotly_chart(bar, use_container_width=True)
 
             # ----------------------------
-            # HEATMAP
+            # ----------------------------
+            # HEATMAP (with annotations)
             # ----------------------------
             heat_archetypes = [
                 ["Visionary", "Strategist", "Storyteller"],
                 ["Catalyst", "Apex Innovator", "Integrator"],
                 ["Engineer", "Operator", "Experimenter"]
             ]
-
+            
             heat_values = [
                 [probs.get(a, 0) for a in row]
                 for row in heat_archetypes
             ]
-
+            
+            row_labels = ["Ideation Cluster", "Activation Cluster", "Execution Cluster"]
+            col_labels = ["Visionary", "Strategist", "Storyteller"]
+            
             heat = go.Figure(data=go.Heatmap(
                 z=heat_values,
-                x=["Visionary", "Strategist", "Storyteller"],
-                y=["Ideation", "Activation", "Execution"],
+                x=col_labels,
+                y=row_labels,
                 colorscale="blues",
                 showscale=True,
+                zmin=0,
+                zmax=max(max(row) for row in heat_values) or 1,
+                hoverinfo="skip"
             ))
-
+            
+            # Add text annotations for each cell
+            annotations = []
+            for i, row in enumerate(heat_archetypes):
+                for j, archetype in enumerate(row):
+                    pct = probs.get(archetype, 0)
+                    annotations.append(dict(
+                        x=col_labels[j],
+                        y=row_labels[i],
+                        text=f"<b>{archetype}</b><br>{pct:.1f}%",
+                        showarrow=False,
+                        font=dict(color="black", size=13),
+                        align="center"
+                    ))
+            
+            heat.update_layout(
+                annotations=annotations,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=40, r=40, t=60, b=40),
+                xaxis=dict(side="top")
+            )
+            
             st.plotly_chart(heat, use_container_width=True)
+    
 
             # ----------------------------
             # TEXT BREAKDOWN
