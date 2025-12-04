@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 
 from idix_engine import (
     normalize_scores,
-    combine_with_scenarios,
     determine_archetype,
     monte_carlo_probabilities,
 )
@@ -14,7 +13,7 @@ from idix_engine import (
 # ============================================================
 
 if "step" not in st.session_state:
-    st.session_state["step"] = 1  # 1 = Questions, 2 = Scenarios, 3 = Results
+    st.session_state["step"] = 1  # 1 = Questions, 2 = Results
 
 if "has_results" not in st.session_state:
     st.session_state["has_results"] = False
@@ -51,7 +50,6 @@ def load_json(path, default=None):
 
 questions = load_json("data/questions.json", default=[])
 archetypes = load_json("data/archetypes.json", default={})
-scenarios = load_json("data/scenarios.json", default=[])
 
 
 # ============================================================
@@ -73,16 +71,15 @@ st.markdown("""
 
 
 # ============================================================
-# STEP PROGRESS BAR
+# STEP PROGRESS BAR (2 STEPS NOW)
 # ============================================================
 
 step = st.session_state["step"]
-total_steps = 3
+total_steps = 2
 
 step_labels = {
-    1: "Step 1 of 3 — Innovation Profile Questionnaire",
-    2: "Step 2 of 3 — Scenario-Based Assessment",
-    3: "Step 3 of 3 — Your Innovator Type & Results",
+    1: "Step 1 of 2 — Innovation Profile Questionnaire",
+    2: "Step 2 of 2 — Your Innovator Type & Results",
 }
 
 st.markdown(f"### {step_labels[step]}")
@@ -90,7 +87,7 @@ st.progress(step / total_steps)
 
 
 # ============================================================
-# HELPERS TO RECONSTRUCT ANSWERS & SCENARIOS FROM STATE
+# HELPERS TO RECONSTRUCT ANSWERS FROM STATE
 # ============================================================
 
 def get_answers_from_state(questions_list):
@@ -109,35 +106,19 @@ def get_answers_from_state(questions_list):
     return answers
 
 
-def get_scenario_scores_from_state(scenarios_list):
-    """Uses stored selectbox choices to compute scenario_scores across dimensions."""
-    accum = {
-        "thinking": 0,
-        "execution": 0,
-        "risk": 0,
-        "motivation": 0,
-        "team": 0,
-        "commercial": 0,
-    }
-    count = 0
+# ============================================================
+# LIKERT LEGEND (1–5 MEANING)
+# ============================================================
 
-    for i, sc in enumerate(scenarios_list):
-        mapping = sc.get("mapping", {})
-        choice = st.session_state.get(f"sc_{i}")
-
-        if choice is None or choice not in mapping:
-            continue
-
-        vec = mapping.get(choice, {})
-        for k in accum:
-            accum[k] += vec.get(k, 0)
-        count += 1
-
-    if count == 0:
-        return accum.copy()
-
-    return {k: accum[k] / count for k in accum}
-
+LIKERT_LEGEND = """
+<div class="likert-legend">
+<span>1 = Strongly Disagree</span>
+<span>2 = Disagree</span>
+<span>3 = Neutral</span>
+<span>4 = Agree</span>
+<span>5 = Strongly Agree</span>
+</div>
+"""
 
 # ============================================================
 # STEP 1 — QUESTIONNAIRE
@@ -148,22 +129,29 @@ if step == 1:
     if not questions:
         st.error("❌ No questions found. Check data/questions.json.")
     else:
+        st.markdown(LIKERT_LEGEND, unsafe_allow_html=True)
+
         for i, q in enumerate(questions):
             text = q.get("question", f"Question {i+1}")
 
+            # Question Card
             st.markdown(f"""
-            <div class='itype-question-card'>
-                <h3>{text}</h3>
+            <div class='itype-question'>
+                <p><b>{text}</b></p>
             </div>
             """, unsafe_allow_html=True)
 
+            # Slider directly below question
             st.slider(
                 label="",
                 min_value=1,
                 max_value=5,
                 value=st.session_state.get(f"q{i}", 3),
-                key=f"q{i}"
+                key=f"q{i}",
+                help="1 = Strongly Disagree · 5 = Strongly Agree"
             )
+
+            st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -171,9 +159,9 @@ if step == 1:
 
     with col1:
         if st.button("Reset"):
-            # Clear all answers & scenarios
+            # Clear all answers
             for key in list(st.session_state.keys()):
-                if key.startswith("q") or key.startswith("sc_"):
+                if key.startswith("q"):
                     del st.session_state[key]
             st.session_state["step"] = 1
             st.session_state["has_results"] = False
@@ -181,71 +169,21 @@ if step == 1:
             st.rerun()
 
     with col2:
-        if st.button("Next ➜ Scenarios"):
+        if st.button("Next ➜ See My Results"):
             st.session_state["step"] = 2
             st.rerun()
 
 
 # ============================================================
-# STEP 2 — SCENARIOS
+# STEP 2 — RESULTS
 # ============================================================
 
 elif step == 2:
-
-    st.markdown("<h2>Scenario-Based Assessment</h2>", unsafe_allow_html=True)
-
-    if not scenarios:
-        st.error("❌ No scenarios found. Check data/scenarios.json.")
-    else:
-        for i, sc in enumerate(scenarios):
-            title = sc.get("title", f"Scenario {i+1}")
-            desc = sc.get("description", "No description provided.")
-            options = sc.get("options", [])
-
-            # Card + attached selectbox block
-            st.markdown(f"""
-            <div class="scenario-card">
-                <h3>{title}</h3>
-                <p>{desc}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.markdown("<div class='scenario-selectbox'>", unsafe_allow_html=True)
-
-            st.selectbox(
-                label="Your response:",
-                options=options,
-                key=f"sc_{i}",
-                label_visibility="collapsed"
-            )
-
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<div class='scenario-spacer'></div>", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        if st.button("⬅ Back to Questions"):
-            st.session_state["step"] = 1
-            st.rerun()
-
-    with col3:
-        if st.button("Next ➜ Results"):
-            st.session_state["step"] = 3
-            st.rerun()
-
-
-# ============================================================
-# STEP 3 — RESULTS
-# ============================================================
-
-elif step == 3:
 
     if not questions or not archetypes:
         st.error("❌ Missing questions or archetypes configuration.")
     else:
         answers = get_answers_from_state(questions)
-        scenario_scores = get_scenario_scores_from_state(scenarios)
 
         calc = st.button("🚀 Calculate My Innovator Type")
 
@@ -254,24 +192,29 @@ elif step == 3:
             st.session_state["open_archetype"] = None  # reset open tile
 
             # Step 1: questionnaire scores
-            q_scores = normalize_scores(answers)
+            final_scores = normalize_scores(answers)
 
-            # Step 2: combine with scenarios
-            final_scores = combine_with_scenarios(q_scores, scenario_scores)
-
-            # Step 3: determine primary archetype
+            # Step 2: determine primary archetype
             primary_name, archetype_data = determine_archetype(final_scores, archetypes)
 
             if primary_name is None or archetype_data is None:
                 st.error("❌ Could not determine an archetype. Check configuration.")
             else:
-                # Step 4: Monte Carlo identity spectrum
+                # Step 3: Monte Carlo identity spectrum
                 probs, stability, shadow = monte_carlo_probabilities(final_scores, archetypes)
                 shadow_name, shadow_pct = shadow
 
                 # ----------------------------------------------
-                # HERO CARD
+                # HERO CARD + MAIN ARCHETYPE IMAGE
                 # ----------------------------------------------
+                img_path = f"data/archetype_images/{primary_name}.png"
+
+                # Show image if present (won't break if missing)
+                try:
+                    st.image(img_path, use_column_width=False)
+                except Exception:
+                    pass
+
                 st.markdown(f"""
                 <div class='itype-result-card'>
                 <h1>{primary_name}</h1>
@@ -399,8 +342,8 @@ elif step == 3:
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        if st.button("⬅ Back to Scenarios"):
-            st.session_state["step"] = 2
+        if st.button("⬅ Back to Questions"):
+            st.session_state["step"] = 1
             st.session_state["has_results"] = False
             st.session_state["open_archetype"] = None
             st.rerun()
@@ -415,13 +358,14 @@ elif step == 3:
             st.session_state["open_archetype"] = None
             st.rerun()
 
+
 # ============================================================
 # ARCHETYPE GRID WITH SIMPLE BUTTONS (3×3)
 # ============================================================
 
 if st.session_state.get("has_results") and archetypes:
 
-    # Create the state key once
+    # Create the state key once (safety)
     if "open_archetype" not in st.session_state:
         st.session_state["open_archetype"] = None
 
@@ -434,33 +378,24 @@ if st.session_state.get("has_results") and archetypes:
 
     for idx, (name, data) in enumerate(archetypes.items()):
         with cols[idx % 3]:
-
-            # SIMPLE button — NO HTML
             if st.button(name, key=f"arch_btn_{name}", use_container_width=True):
-
                 # Toggle open/close
                 if st.session_state["open_archetype"] == name:
                     st.session_state["open_archetype"] = None
                 else:
                     st.session_state["open_archetype"] = name
 
-    # ============================================================
     # EXPANDED PANEL
-    # ============================================================
     selected = st.session_state["open_archetype"]
 
- 
-
     if selected is not None:
-
         img_path = f"data/archetype_images/{selected}.png"
 
-   
+        try:
+            st.image(img_path, use_column_width=True)
+        except Exception:
+            pass
 
-        # IMAGE
-        st.image(img_path, use_column_width=True)
-
-        # PANEL
         info = archetypes[selected]
 
         st.markdown(f"""
