@@ -6,6 +6,7 @@ from idix_engine import (
     normalize_scores,
     determine_archetype,
     monte_carlo_probabilities,
+    compute_archetype_distances,   # <-- ADD THIS
 )
 
 # Optional: anonymous logging (safe if file missing)
