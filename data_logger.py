@@ -38,3 +38,12 @@ def log_to_google_sheets(final_archetype, stability, shadow, scores, raw_answers
     ]
 
     sheet.append_row(row)
+import traceback
+import streamlit as st
+
+try:
+    worksheet.append_row(row)
+    st.write("Logged successfully")
+except Exception as e:
+    st.error("Logging failed")
+    st.code(traceback.format_exc())
