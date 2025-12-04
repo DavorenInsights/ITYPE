@@ -2,12 +2,12 @@
   "Visionary": {
     "description": "You imagine future possibilities, connect dots others can't see, and gravitate toward high-upside, bold concepts.",
     "signature": {
-      "thinking": 85,
-      "execution": 45,
-      "risk": 70,
+      "thinking": 90,
+      "execution": 40,
+      "risk": 80,
       "motivation": 75,
-      "team": 55,
-      "commercial": 50
+      "team": 50,
+      "commercial": 45
     },
     "strengths": [
       "Exceptional big-picture thinking",
@@ -27,11 +27,11 @@
   "Catalyst": {
     "description": "You ignite momentum, energise teams, and push ideas into reality with urgency and enthusiasm.",
     "signature": {
-      "thinking": 60,
-      "execution": 70,
-      "risk": 65,
-      "motivation": 85,
-      "team": 65,
+      "thinking": 65,
+      "execution": 80,
+      "risk": 60,
+      "motivation": 90,
+      "team": 60,
       "commercial": 55
     },
     "strengths": [
@@ -51,11 +51,11 @@
   "Engineer": {
     "description": "You excel in execution, structure, system-building, and delivering practical solutions with precision.",
     "signature": {
-      "thinking": 55,
-      "execution": 90,
-      "risk": 40,
+      "thinking": 60,
+      "execution": 95,
+      "risk": 35,
       "motivation": 65,
-      "team": 60,
+      "team": 55,
       "commercial": 45
     },
     "strengths": [
@@ -75,11 +75,11 @@
   "Strategist": {
     "description": "You think in terms of markets, value, and long-term positioning. You optimise for impact and big-picture clarity.",
     "signature": {
-      "thinking": 70,
+      "thinking": 80,
       "execution": 55,
-      "risk": 45,
+      "risk": 40,
       "motivation": 60,
-      "team": 65,
+      "team": 60,
       "commercial": 90
     },
     "strengths": [
@@ -99,10 +99,10 @@
   "Experimenter": {
     "description": "You learn by trying, testing, and iterating. You thrive in ambiguity and adapt rapidly.",
     "signature": {
-      "thinking": 65,
+      "thinking": 75,
       "execution": 60,
-      "risk": 75,
-      "motivation": 70,
+      "risk": 85,
+      "motivation": 65,
       "team": 50,
       "commercial": 40
     },
@@ -124,10 +124,10 @@
     "description": "You bring people, ideas, and systems together, balancing innovation with practicality.",
     "signature": {
       "thinking": 60,
-      "execution": 65,
-      "risk": 50,
+      "execution": 60,
+      "risk": 45,
       "motivation": 55,
-      "team": 85,
+      "team": 90,
       "commercial": 55
     },
     "strengths": [
@@ -147,11 +147,11 @@
   "Operator": {
     "description": "You run systems smoothly, optimise processes, and ensure reliability in innovation environments.",
     "signature": {
-      "thinking": 50,
-      "execution": 80,
-      "risk": 35,
+      "thinking": 55,
+      "execution": 85,
+      "risk": 30,
       "motivation": 60,
-      "team": 70,
+      "team": 75,
       "commercial": 50
     },
     "strengths": [
@@ -173,10 +173,10 @@
     "signature": {
       "thinking": 70,
       "execution": 45,
-      "risk": 50,
-      "motivation": 80,
-      "team": 65,
-      "commercial": 70
+      "risk": 45,
+      "motivation": 90,
+      "team": 70,
+      "commercial": 85
     },
     "strengths": [
       "Persuasive communication",
@@ -195,12 +195,12 @@
   "Apex Innovator": {
     "description": "You combine exceptional creativity, execution strength, commercial intuition, and resilience. You operate at the apex of innovation capability: fast, adaptable, and deeply strategic.",
     "signature": {
-      "thinking": 90,
-      "execution": 92,
-      "risk": 78,
-      "motivation": 90,
-      "team": 82,
-      "commercial": 85
+      "thinking": 95,
+      "execution": 95,
+      "risk": 85,
+      "motivation": 95,
+      "team": 90,
+      "commercial": 90
     },
     "strengths": [
       "Elite-level creative and analytical ability",
